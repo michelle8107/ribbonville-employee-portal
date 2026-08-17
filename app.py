@@ -66,9 +66,6 @@ with tab_links:
                         st.caption(f"`{row['카테고리'] or '기타'}`  ·  담당: {row['담당자'] or '-'}")
                         if row["설명"]:
                             st.caption(row["설명"])
-                        if st.button("삭제", key=f"del_link_{i}", use_container_width=True):
-                            db.delete_link(i)
-                            st.rerun()
 
     st.divider()
     with st.expander("➕ 새 링크 추가"):
@@ -87,6 +84,17 @@ with tab_links:
                 else:
                     db.add_link({"이름": name, "링크": link, "설명": desc, "카테고리": category, "담당자": owner})
                     st.success("추가했습니다.")
+                    st.rerun()
+
+    if not links_df.empty:
+        with st.expander("🗑️ 링크 삭제"):
+            options = [f"{row['이름']} ({row['링크']})" for _, row in links_df.iterrows()]
+            target = st.selectbox("삭제할 링크 선택", options, index=None, placeholder="선택하세요")
+            if target is not None:
+                target_idx = options.index(target)
+                if st.button(f"'{links_df.iloc[target_idx]['이름']}' 삭제 확인", type="primary"):
+                    db.delete_link(target_idx)
+                    st.success("삭제했습니다.")
                     st.rerun()
 
 with tab_calendar:
