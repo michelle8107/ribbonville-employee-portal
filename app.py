@@ -28,6 +28,13 @@ if not db.has_credentials() or not st.secrets.get("SPREADSHEET_ID"):
     st.stop()
 
 CATEGORIES = ["재고관리", "매출/정산", "마케팅", "거래처", "기타"]
+CATEGORY_ICON = {
+    "재고관리": "📦",
+    "매출/정산": "💰",
+    "마케팅": "📢",
+    "거래처": "🤝",
+    "기타": "🔗",
+}
 STATUS_BADGE = {"예정": "🟡", "진행중": "🔵", "완료": "🟢"}
 
 tab_links, tab_calendar = st.tabs(["📊 스프레드시트 링크", "📅 업무 달력"])
@@ -35,6 +42,35 @@ tab_links, tab_calendar = st.tabs(["📊 스프레드시트 링크", "📅 업�
 with tab_links:
     st.subheader("자주 쓰는 스프레드시트 링크")
 
+    try:
+        links_df = db.load_links()
+    except Exception as e:
+        st.error(f"구글 시트를 불러오지 못했습니다: {e}")
+        links_df = pd.DataFrame(columns=["이름", "링크", "설명", "카테고리", "담당자"])
+
+    if links_df.empty:
+        st.info("등록된 링크가 없습니다. 아래에서 추가해주세요.")
+    else:
+        selected_cats = st.multiselect("카테고리 필터", CATEGORIES)
+        view_df = links_df if not selected_cats else links_df[links_df["카테고리"].isin(selected_cats)]
+
+        cols_per_row = 3
+        rows = [view_df.iloc[i:i + cols_per_row] for i in range(0, len(view_df), cols_per_row)]
+        for chunk in rows:
+            cols = st.columns(cols_per_row)
+            for col, (i, row) in zip(cols, chunk.iterrows()):
+                icon = CATEGORY_ICON.get(row["카테고리"], "🔗")
+                with col:
+                    with st.container(border=True):
+                        st.markdown(f"### {icon} [{row['이름']}]({row['링크']})")
+                        st.caption(f"`{row['카테고리'] or '기타'}`  ·  담당: {row['담당자'] or '-'}")
+                        if row["설명"]:
+                            st.caption(row["설명"])
+                        if st.button("삭제", key=f"del_link_{i}", use_container_width=True):
+                            db.delete_link(i)
+                            st.rerun()
+
+    st.divider()
     with st.expander("➕ 새 링크 추가"):
         with st.form("add_link_form", clear_on_submit=True):
             c1, c2 = st.columns(2)
@@ -52,30 +88,6 @@ with tab_links:
                     db.add_link({"이름": name, "링크": link, "설명": desc, "카테고리": category, "담당자": owner})
                     st.success("추가했습니다.")
                     st.rerun()
-
-    try:
-        links_df = db.load_links()
-    except Exception as e:
-        st.error(f"구글 시트를 불러오지 못했습니다: {e}")
-        links_df = pd.DataFrame(columns=["이름", "링크", "설명", "카테고리", "담당자"])
-
-    if links_df.empty:
-        st.info("등록된 링크가 없습니다. 위에서 추가해주세요.")
-    else:
-        selected_cats = st.multiselect("카테고리 필터", CATEGORIES)
-        view_df = links_df if not selected_cats else links_df[links_df["카테고리"].isin(selected_cats)]
-
-        for i, row in view_df.iterrows():
-            with st.container(border=True):
-                c1, c2 = st.columns([6, 1])
-                with c1:
-                    st.markdown(f"**[{row['이름']}]({row['링크']})**  ·  `{row['카테고리'] or '기타'}`  ·  담당: {row['담당자'] or '-'}")
-                    if row["설명"]:
-                        st.caption(row["설명"])
-                with c2:
-                    if st.button("삭제", key=f"del_link_{i}"):
-                        db.delete_link(i)
-                        st.rerun()
 
 with tab_calendar:
     st.subheader("팀 업무 달력")
@@ -144,12 +156,49 @@ with tab_calendar:
     else:
         for i, row in month_events.sort_values("날짜").iterrows():
             with st.container(border=True):
-                c1, c2 = st.columns([6, 1])
-                with c1:
-                    st.markdown(f"{STATUS_BADGE.get(row['상태'], '⚪')} **{row['날짜']} · {row['제목']}**  ·  담당: {row['담당자'] or '-'}")
-                    if row["설명"]:
-                        st.caption(row["설명"])
-                with c2:
-                    if st.button("삭제", key=f"del_event_{i}"):
-                        db.delete_event(i)
-                        st.rerun()
+                if st.session_state.get("editing_event") == i:
+                    with st.form(f"edit_event_form_{i}"):
+                        c1, c2 = st.columns(2)
+                        with c1:
+                            edit_title = st.text_input("제목 *", value=row["제목"])
+                            edit_date = st.date_input(
+                                "날짜 *",
+                                value=row["날짜"] if isinstance(row["날짜"], date) else date.today(),
+                            )
+                            edit_status = st.selectbox(
+                                "상태", list(STATUS_BADGE.keys()),
+                                index=list(STATUS_BADGE.keys()).index(row["상태"]) if row["상태"] in STATUS_BADGE else 0,
+                            )
+                        with c2:
+                            edit_owner = st.text_input("담당자", value=row["담당자"])
+                            edit_desc = st.text_area("설명", value=row["설명"], height=100)
+                        save_col, cancel_col = st.columns(2)
+                        with save_col:
+                            if st.form_submit_button("저장", use_container_width=True):
+                                if not edit_title:
+                                    st.warning("제목은 필수입니다.")
+                                else:
+                                    db.update_event(i, {
+                                        "제목": edit_title, "날짜": edit_date.isoformat(),
+                                        "담당자": edit_owner, "설명": edit_desc, "상태": edit_status,
+                                    })
+                                    del st.session_state["editing_event"]
+                                    st.rerun()
+                        with cancel_col:
+                            if st.form_submit_button("취소", use_container_width=True):
+                                del st.session_state["editing_event"]
+                                st.rerun()
+                else:
+                    c1, c2, c3 = st.columns([6, 1, 1])
+                    with c1:
+                        st.markdown(f"{STATUS_BADGE.get(row['상태'], '⚪')} **{row['날짜']} · {row['제목']}**  ·  담당: {row['담당자'] or '-'}")
+                        if row["설명"]:
+                            st.caption(row["설명"])
+                    with c2:
+                        if st.button("수정", key=f"edit_event_{i}"):
+                            st.session_state["editing_event"] = i
+                            st.rerun()
+                    with c3:
+                        if st.button("삭제", key=f"del_event_{i}"):
+                            db.delete_event(i)
+                            st.rerun()

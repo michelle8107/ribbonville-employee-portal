@@ -102,3 +102,11 @@ def delete_event(row_index: int) -> None:
     ws = _worksheet(CALENDAR_SHEET, CALENDAR_HEADER)
     ws.delete_rows(row_index + 2)
     load_calendar.clear()
+
+
+def update_event(row_index: int, row: dict) -> None:
+    ws = _worksheet(CALENDAR_SHEET, CALENDAR_HEADER)
+    sheet_row = row_index + 2  # +1 header, +1 1-indexed
+    values = [str(row.get(c, "")) for c in CALENDAR_HEADER]
+    ws.update(f"A{sheet_row}:{chr(ord('A') + len(CALENDAR_HEADER) - 1)}{sheet_row}", [values])
+    load_calendar.clear()
