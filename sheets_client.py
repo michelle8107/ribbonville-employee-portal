@@ -4,6 +4,8 @@
 없으면 자동으로 만들어준다.
 """
 
+import json
+
 import gspread
 import pandas as pd
 import streamlit as st
@@ -21,10 +23,26 @@ CALENDAR_SHEET = "달력"
 CALENDAR_HEADER = ["제목", "날짜", "담당자", "설명", "상태"]
 
 
+def has_credentials() -> bool:
+    return bool(st.secrets.get("gcp_service_account") or st.secrets.get("GCP_SERVICE_ACCOUNT_JSON"))
+
+
+def _service_account_info() -> dict:
+    """서비스 계정 키를 두 가지 형태 중 하나로 받는다.
+
+    1) [gcp_service_account] TOML 테이블 (필드별로 입력)
+    2) GCP_SERVICE_ACCOUNT_JSON 문자열 (다운로드한 JSON 파일 내용을 통째로 붙여넣기)
+    두 번째 방식이 직원이 값을 하나씩 옮겨 적을 필요가 없어 훨씬 간단하다.
+    """
+    table = st.secrets.get("gcp_service_account")
+    if table:
+        return dict(table)
+    raw_json = st.secrets["GCP_SERVICE_ACCOUNT_JSON"]
+    return json.loads(raw_json)
+
+
 def _client() -> gspread.Client:
-    creds = Credentials.from_service_account_info(
-        st.secrets["gcp_service_account"], scopes=SCOPES
-    )
+    creds = Credentials.from_service_account_info(_service_account_info(), scopes=SCOPES)
     return gspread.authorize(creds)
 
 

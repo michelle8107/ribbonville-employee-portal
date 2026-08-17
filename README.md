@@ -30,25 +30,17 @@
 
 ### 3. Streamlit Cloud에 Secrets 입력
 
-App settings > Secrets 에 아래 형식으로 입력 (`.streamlit/secrets.toml.example` 참고):
+App settings > Secrets 에 아래처럼 입력 (`.streamlit/secrets.toml.example` 참고):
 
 ```toml
 SPREADSHEET_ID = "복사한 시트 ID"
 
-[gcp_service_account]
-type = "service_account"
-project_id = "..."
-private_key_id = "..."
-private_key = "-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----\n"
-client_email = "...@....iam.gserviceaccount.com"
-client_id = "..."
-auth_uri = "https://accounts.google.com/o/oauth2/auth"
-token_uri = "https://oauth2.googleapis.com/token"
-auth_provider_x509_cert_url = "https://www.googleapis.com/oauth2/v1/certs"
-client_x509_cert_url = "..."
+GCP_SERVICE_ACCOUNT_JSON = '''
+(다운로드한 JSON 키 파일을 메모장으로 열어서 내용 전체를 그대로 여기에 붙여넣기)
+'''
 ```
 
-다운로드한 JSON 파일을 열어서 값을 그대로 옮기면 됩니다 (`private_key`의 줄바꿈은 `\n`으로 그대로 두면 됩니다).
+값을 하나씩 옮겨 적을 필요 없이, 다운로드한 JSON 파일 내용을 통째로 `'''` 사이에 붙여넣기만 하면 된다.
 
 ## 로컬 실행
 

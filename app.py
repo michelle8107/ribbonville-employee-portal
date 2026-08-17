@@ -19,14 +19,11 @@ st.set_page_config(page_title="리본빌 직원 홈페이지", page_icon="🏠",
 
 st.title("🏠 리본빌 직원 홈페이지")
 
-try:
-    st.secrets["gcp_service_account"]
-    st.secrets["SPREADSHEET_ID"]
-except Exception:
+if not db.has_credentials() or not st.secrets.get("SPREADSHEET_ID"):
     st.error(
         "구글 시트 연동이 설정되지 않았습니다.\n\n"
-        "Streamlit Cloud > App settings > Secrets 에 `gcp_service_account`(서비스 계정 키)와 "
-        "`SPREADSHEET_ID`(구글 시트 ID)를 입력해주세요. 자세한 방법은 README를 참고하세요."
+        "Streamlit Cloud > App settings > Secrets 에 `GCP_SERVICE_ACCOUNT_JSON`(서비스 계정 키 파일 "
+        "내용 전체)과 `SPREADSHEET_ID`(구글 시트 ID)를 입력해주세요. 자세한 방법은 README를 참고하세요."
     )
     st.stop()
 
