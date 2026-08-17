@@ -27,9 +27,10 @@ if not db.has_credentials() or not st.secrets.get("SPREADSHEET_ID"):
     )
     st.stop()
 
-CATEGORIES = ["재고관리", "매출/정산", "마케팅", "거래처", "기타"]
+CATEGORIES = ["재고관리", "영업물류관리", "매출/정산", "마케팅", "거래처", "기타"]
 CATEGORY_ICON = {
     "재고관리": "📦",
+    "영업물류관리": "🚚",
     "매출/정산": "💰",
     "마케팅": "📢",
     "거래처": "🤝",
