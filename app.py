@@ -35,37 +35,52 @@ CATEGORY_ICON = {
     "거래처": "🤝",
     "기타": "🔗",
 }
+LINK_TYPES = ["스프레드시트", "웹사이트"]
+TYPE_ICON = {"스프레드시트": "📊", "웹사이트": "🌐", "미분류": "📁"}
 STATUS_BADGE = {"예정": "🟡", "진행중": "🔵", "완료": "🟢"}
 
 tab_links, tab_calendar = st.tabs(["📊 스프레드시트 링크", "📅 업무 달력"])
 
+
+def _render_link_cards(df: pd.DataFrame) -> None:
+    cols_per_row = 3
+    chunks = [df.iloc[i:i + cols_per_row] for i in range(0, len(df), cols_per_row)]
+    for chunk in chunks:
+        cols = st.columns(cols_per_row)
+        for col, (_, row) in zip(cols, chunk.iterrows()):
+            icon = CATEGORY_ICON.get(row["카테고리"], "🔗")
+            with col:
+                with st.container(border=True):
+                    st.markdown(f"### {icon} [{row['이름']}]({row['링크']})")
+                    st.caption(f"`{row['카테고리'] or '기타'}`  ·  담당: {row['담당자'] or '-'}")
+                    if row["설명"]:
+                        st.caption(row["설명"])
+
+
 with tab_links:
-    st.subheader("자주 쓰는 스프레드시트 링크")
+    st.subheader("자주 쓰는 링크 모음")
 
     try:
         links_df = db.load_links()
     except Exception as e:
         st.error(f"구글 시트를 불러오지 못했습니다: {e}")
-        links_df = pd.DataFrame(columns=["이름", "링크", "설명", "카테고리", "담당자"])
+        links_df = pd.DataFrame(columns=["이름", "링크", "설명", "카테고리", "담당자", "유형"])
 
     if links_df.empty:
         st.info("등록된 링크가 없습니다. 아래에서 추가해주세요.")
     else:
         selected_cats = st.multiselect("카테고리 필터", CATEGORIES)
-        view_df = links_df if not selected_cats else links_df[links_df["카테고리"].isin(selected_cats)]
+        filtered_df = links_df if not selected_cats else links_df[links_df["카테고리"].isin(selected_cats)]
 
-        cols_per_row = 3
-        rows = [view_df.iloc[i:i + cols_per_row] for i in range(0, len(view_df), cols_per_row)]
-        for chunk in rows:
-            cols = st.columns(cols_per_row)
-            for col, (i, row) in zip(cols, chunk.iterrows()):
-                icon = CATEGORY_ICON.get(row["카테고리"], "🔗")
-                with col:
-                    with st.container(border=True):
-                        st.markdown(f"### {icon} [{row['이름']}]({row['링크']})")
-                        st.caption(f"`{row['카테고리'] or '기타'}`  ·  담당: {row['담당자'] or '-'}")
-                        if row["설명"]:
-                            st.caption(row["설명"])
+        for link_type in [*LINK_TYPES, "미분류"]:
+            if link_type == "미분류":
+                type_df = filtered_df[~filtered_df["유형"].isin(LINK_TYPES)]
+            else:
+                type_df = filtered_df[filtered_df["유형"] == link_type]
+            if type_df.empty:
+                continue
+            st.markdown(f"#### {TYPE_ICON[link_type]} {link_type} ({len(type_df)})")
+            _render_link_cards(type_df)
 
     st.divider()
     with st.expander("➕ 새 링크 추가"):
@@ -74,6 +89,7 @@ with tab_links:
             with c1:
                 name = st.text_input("이름 *")
                 link = st.text_input("링크(URL) *")
+                link_type = st.selectbox("유형", LINK_TYPES)
                 category = st.selectbox("카테고리", CATEGORIES)
             with c2:
                 owner = st.text_input("담당자")
@@ -82,7 +98,10 @@ with tab_links:
                 if not name or not link:
                     st.warning("이름과 링크는 필수입니다.")
                 else:
-                    db.add_link({"이름": name, "링크": link, "설명": desc, "카테고리": category, "담당자": owner})
+                    db.add_link({
+                        "이름": name, "링크": link, "설명": desc,
+                        "카테고리": category, "담당자": owner, "유형": link_type,
+                    })
                     st.success("추가했습니다.")
                     st.rerun()
 
