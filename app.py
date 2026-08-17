@@ -1,4 +1,4 @@
-"""리본빌 직원 홈페이지 (Streamlit 웹앱)
+"""리본빌 경영관리 (Streamlit 웹앱)
 
 기능:
   1. 스프레드시트 링크 모음
@@ -8,6 +8,7 @@
 """
 
 import calendar
+import html
 from datetime import date
 
 import pandas as pd
@@ -15,9 +16,9 @@ import streamlit as st
 
 import sheets_client as db
 
-st.set_page_config(page_title="리본빌 직원 홈페이지", page_icon="🏠", layout="wide")
+st.set_page_config(page_title="리본빌 경영관리", page_icon="🏠", layout="wide")
 
-st.title("🏠 리본빌 직원 홈페이지")
+st.title("🏠 리본빌 경영관리")
 
 if not db.has_credentials() or not st.secrets.get("SPREADSHEET_ID"):
     st.error(
@@ -50,9 +51,26 @@ def _render_link_cards(df: pd.DataFrame) -> None:
         cols = st.columns(cols_per_row)
         for col, (_, row) in zip(cols, chunk.iterrows()):
             icon = CATEGORY_ICON.get(row["카테고리"], "🔗")
+            name = html.escape(str(row["이름"]))
+            url = html.escape(str(row["링크"]), quote=True)
             with col:
                 with st.container(border=True):
-                    st.markdown(f"### {icon} [{row['이름']}]({row['링크']})")
+                    st.markdown(
+                        f"""
+                        <div style="display:flex;align-items:center;gap:8px;">
+                            <div style="flex:0 0 auto;width:30px;height:30px;border-radius:50%;
+                                        background:rgba(255,255,255,0.09);display:flex;
+                                        align-items:center;justify-content:center;font-size:15px;">
+                                {icon}
+                            </div>
+                            <a href="{url}" target="_blank" rel="noopener"
+                               style="font-size:14px;font-weight:600;text-decoration:none;">
+                                {name}
+                            </a>
+                        </div>
+                        """,
+                        unsafe_allow_html=True,
+                    )
                     st.caption(f"`{row['카테고리'] or '기타'}`  ·  담당: {row['담당자'] or '-'}")
                     if row["설명"]:
                         st.caption(row["설명"])
