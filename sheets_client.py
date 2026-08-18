@@ -23,6 +23,9 @@ LINKS_HEADER = ["이름", "링크", "설명", "카테고리", "담당자", "유�
 CALENDAR_SHEET = "달력"
 CALENDAR_HEADER = ["제목", "날짜", "담당자", "설명", "상태"]
 
+TODO_SHEET = "할일"
+TODO_HEADER = ["구분", "내용", "완료", "등록일시"]
+
 
 def has_credentials() -> bool:
     return bool(st.secrets.get("gcp_service_account") or st.secrets.get("GCP_SERVICE_ACCOUNT_JSON"))
@@ -111,3 +114,33 @@ def update_event(row_index: int, row: dict) -> None:
     values = [str(row.get(c, "")) for c in CALENDAR_HEADER]
     ws.update(f"A{sheet_row}:{chr(ord('A') + len(CALENDAR_HEADER) - 1)}{sheet_row}", [values])
     load_calendar.clear()
+
+
+@st.cache_data(ttl=60, show_spinner=False)
+def load_todos() -> pd.DataFrame:
+    ws = _worksheet(TODO_SHEET, TODO_HEADER)
+    records = ws.get_all_records()
+    df = pd.DataFrame(records, columns=TODO_HEADER)
+    if not df.empty:
+        df["완료"] = df["완료"].astype(str).str.upper() == "TRUE"
+    return df
+
+
+def add_todo(row: dict) -> None:
+    ws = _worksheet(TODO_SHEET, TODO_HEADER)
+    ws.append_row([str(row.get(c, "")) for c in TODO_HEADER])
+    load_todos.clear()
+
+
+def set_todo_done(row_index: int, done: bool) -> None:
+    ws = _worksheet(TODO_SHEET, TODO_HEADER)
+    sheet_row = row_index + 2  # +1 header, +1 1-indexed
+    done_col = TODO_HEADER.index("완료") + 1
+    ws.update_cell(sheet_row, done_col, "TRUE" if done else "FALSE")
+    load_todos.clear()
+
+
+def delete_todo(row_index: int) -> None:
+    ws = _worksheet(TODO_SHEET, TODO_HEADER)
+    ws.delete_rows(row_index + 2)
+    load_todos.clear()

@@ -9,7 +9,7 @@
 
 import calendar
 import html
-from datetime import date
+from datetime import date, datetime
 
 import pandas as pd
 import streamlit as st
@@ -41,7 +41,9 @@ LINK_TYPES = ["스프레드시트", "웹사이트"]
 TYPE_ICON = {"스프레드시트": "📊", "웹사이트": "🌐", "미분류": "📁"}
 STATUS_BADGE = {"예정": "🟡", "진행중": "🔵", "완료": "🟢"}
 
-tab_links, tab_calendar = st.tabs(["📊 스프레드시트 링크", "📅 업무 달력"])
+TODO_CATEGORIES = ["경영관리", "상품기획"]
+
+tab_links, tab_calendar, tab_todo = st.tabs(["📊 스프레드시트 링크", "📅 업무 달력", "✅ To do list"])
 
 
 def _render_link_cards(df: pd.DataFrame) -> None:
@@ -248,3 +250,54 @@ with tab_calendar:
                         if st.button("삭제", key=f"del_event_{i}"):
                             db.delete_event(i)
                             st.rerun()
+
+with tab_todo:
+    st.subheader("To do list")
+
+    try:
+        todos_df = db.load_todos()
+    except Exception as e:
+        st.error(f"구글 시트를 불러오지 못했습니다: {e}")
+        todos_df = pd.DataFrame(columns=["구분", "내용", "완료", "등록일시"])
+
+    def _render_todo_column(category: str) -> None:
+        st.markdown(f"#### {category} To do list")
+
+        with st.form(f"add_todo_form_{category}", clear_on_submit=True):
+            new_item = st.text_input(
+                "할 일 입력", key=f"new_todo_{category}",
+                label_visibility="collapsed", placeholder="할 일을 입력하고 Enter",
+            )
+            if st.form_submit_button("추가", use_container_width=True):
+                if new_item.strip():
+                    db.add_todo({
+                        "구분": category,
+                        "내용": new_item.strip(),
+                        "완료": "FALSE",
+                        "등록일시": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                    })
+                    st.rerun()
+
+        cat_df = todos_df[todos_df["구분"] == category] if not todos_df.empty else todos_df
+        if cat_df.empty:
+            st.caption("등록된 할 일이 없습니다.")
+            return
+
+        cat_df = cat_df.sort_values(["완료", "등록일시"], kind="stable")
+        for i, row in cat_df.iterrows():
+            c1, c2 = st.columns([8, 1])
+            with c1:
+                checked = st.checkbox(row["내용"], value=bool(row["완료"]), key=f"todo_{category}_{i}")
+                if checked != bool(row["완료"]):
+                    db.set_todo_done(i, checked)
+                    st.rerun()
+            with c2:
+                if st.button("×", key=f"del_todo_{category}_{i}"):
+                    db.delete_todo(i)
+                    st.rerun()
+
+    todo_col1, todo_col2 = st.columns(2)
+    with todo_col1:
+        _render_todo_column(TODO_CATEGORIES[0])
+    with todo_col2:
+        _render_todo_column(TODO_CATEGORIES[1])
